@@ -13,8 +13,8 @@ PROJET_NAME = "taxi"
 # ----------------------
 # Source Volume 
 # ----------------------
-VOLUME_RAW_NAME = f"{RAW_SCHEMA}/raw_data/"
-VOLUME_SOURCE_PATH = f"/Volumes/{CATALOG}/"+ VOLUME_RAW_NAME # Volume contenant tous les CSV
+VOLUME_RAW_NAME = f"{RAW_SCHEMA}"
+VOLUME_SOURCE_PATH = f"/Volumes/{CATALOG}/datasets/"+ VOLUME_RAW_NAME # Volume contenant tous les CSV
 
 # ----------------------
 # Destination Ingestion Data couche Bronze 

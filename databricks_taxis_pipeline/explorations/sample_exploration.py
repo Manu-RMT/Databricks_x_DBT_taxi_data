@@ -24,3 +24,23 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {BRONZE_ZONE}")
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {SILVER_ZONE}")
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {GOLD_SCHEMA}")
 
+
+# COMMAND ----------
+
+entites = {
+           "trips"     : "Historic of Trip Taxi",
+           "vehicules" : "List of Vehicles",
+           "payments"  : "Historic of Payment",
+           "locations" : "Place of Taxi",
+           "drivers"   : "List of Drivers",
+           "customers" : "List of Customers" 
+           }
+
+# Création des tables de landing
+for entity in entites:
+    raw_source_path = f"{VOLUME_SOURCE_PATH}/{entity}/"
+    bronze_schema_autoload_path = f"{BRONZE_METADATA}schema_tracking/{entity}/"
+    print (f"entity = {entity}")
+    print (f"raw_source_path = {raw_source_path}")
+    print (f"bronze_schema_autoload_path = {bronze_schema_autoload_path}")
+

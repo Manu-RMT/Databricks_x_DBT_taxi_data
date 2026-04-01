@@ -16,25 +16,31 @@ entites = {
            "customers" : "List of Customers" 
            }
 
-# Création des tables de landing
-for entity in entites:
 
-    @dlt.table(
-        name = f"taxi_landing_{entity}_incremental",
-        comment = f"Taxi {entites[entity]} incremental"
-    )
+# 1. On définit une fonction qui va créer la table pour une entité spécifique
+def create_landing_table(entity_name, description):
 
-    def taxi_landing_incremental():
-        raw_source_path = f"{VOLUME_SOURCE_PATH}/{entity}/"
-        bronze_schema_autoload_path = f"{BRONZE_METADATA}schema_tracking/{entity}/"
+   raw_source_path = f"{VOLUME_SOURCE_PATH}/{entity_name}/"
+   bronze_schema_autoload_path = f"{BRONZE_METADATA}schema_tracking/{entity_name}/"
 
+   @dlt.table(
+       name = f"taxi_landing_{entity_name}_incremental",
+       comment = f"Taxi {description} incremental"
+   )
+   def taxi_landing_incremental():
+       return (
+           spark.readStream.format("cloudFiles")
+               .option("cloudFiles.format", "csv")
+               .option("header", "true")
+               .option("cloudFiles.includeExistingFiles", "true")
+               .option("cloudFiles.schemaLocation", bronze_schema_autoload_path)
+               .option("cloudFiles.schemaEvolutionMode", "rescue") 
+               .load(raw_source_path)
+       )
 
-        return (
-            spark.readStream.format("cloudFiles")                       # Auto Loader pour ingestion incrémentale
-                    .option("cloudFiles.format", "csv")         # Format source : CSV
-                    .option("header", "true")                   # La 1ère ligne contient les en-têtes
-                    .option("cloudFiles.includeExistingFiles", "true")  # Inclut les fichiers déjà présents au 1er run
-                    .option("cloudFiles.schemaLocation", bronze_schema_autoload_path)  # Suivi du schéma entre runs
-                    .option("cloudFiles.schemaEvolutionMode", "rescue") # Si nouvelle colonne, on le récupère dans cette colonne
-                    .load(raw_source_path)                      # Chargement depuis le volume source
-        )
+# 2. On appelle cette fonction dans la boucle
+# ATTENTION DLT : Evite le Late Binding ou Laison Tardive (dernière valeur du dictionnaire)
+for entity, desc in entites.items():
+   create_landing_table(entity, desc)
+
+ 

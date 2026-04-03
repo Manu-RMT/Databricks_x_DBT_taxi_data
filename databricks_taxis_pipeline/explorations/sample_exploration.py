@@ -27,20 +27,123 @@ spark.sql(f"CREATE SCHEMA IF NOT EXISTS {GOLD_SCHEMA}")
 
 # COMMAND ----------
 
-entites = {
-           "trips"     : "Historic of Trip Taxi",
-           "vehicules" : "List of Vehicles",
-           "payments"  : "Historic of Payment",
-           "locations" : "Place of Taxi",
-           "drivers"   : "List of Drivers",
-           "customers" : "List of Customers" 
-           }
+df = spark.sql(f'select * from {BRONZE_ZONE}.taxi_landing_drivers_incremental')
+df.schema
 
-# Création des tables de landing
-for entity in entites:
-    raw_source_path = f"{VOLUME_SOURCE_PATH}/{entity}/"
-    bronze_schema_autoload_path = f"{BRONZE_METADATA}schema_tracking/{entity}/"
-    print (f"entity = {entity}")
-    print (f"raw_source_path = {raw_source_path}")
-    print (f"bronze_schema_autoload_path = {bronze_schema_autoload_path}")
+# COMMAND ----------
 
+VALID_RULES_OR_FAIL = {
+   "customers" : 
+        {
+        "valid_customer_id" : "CAST(customer_id as bigint)  IS NOT NULL"
+        },
+    "drivers" : 
+        {
+        "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL"
+        },
+     "locations" : 
+        {
+        "valid_location_id" : "CAST(location_id as bigint) IS NOT NULL"
+        },
+     "payments" :
+        {
+        "valid_payment_id"  : "CAST(payment_id as bigint) IS NOT NULL",
+        "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
+        "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL"
+        },
+    "trips" :
+        {
+        "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL",
+        "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
+        "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL",
+        "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL"
+        },
+    "vehicules" :
+        {
+        "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL"
+        }
+
+}
+
+VALID_RULES_OR_DROP = {
+
+    "customers" : 
+        {
+        # "valid_customer_id" : "CAST(customer_id as bigint)  IS NOT NULL",
+        "vaild_first_name"  : "first_name IS NOT NULL",
+        "valid_last_name"   : "last_name IS NOT NULL",
+        "valid_email":         r"email IS NOT NULL AND email RLIKE '^[a-zA-Z0-9][a-zA-Z0-9._-]*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$'",
+        "valid_phone":         "phone_number IS NOT NULL",
+        "valid_city" :         "city IS NOT NULL",
+        "signup_date" :        "CAST(signup_date as date) IS NOT NULL",
+        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
+        "new_data_rescued_data" : "_rescued_data IS NULL",
+        },
+    "drivers" : 
+        {
+        # "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL",
+        "vaild_first_name"  : "first_name IS NOT NULL",
+        "valid_last_name"   : "last_name IS NOT NULL",
+        "valid_phone":        "phone_number IS NOT NULL",
+        "valid_vehicule_id" : "CAST(vehicule_id as int) IS NOT NULL",
+        "valid_driver_rating" : "CAST(driver_rating as double) IS NOT NULL",
+        "valid_city" :        "city IS NOT NULL",
+        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
+        "new_data_rescued_data" : "_rescued_data IS NULL",
+        },
+    "locations" : 
+        {
+        # "valid_location_id" : "CAST(location_id as bigint) IS NOT NULL",
+        "valid_city" : "city IS NOT NULL",
+        "valid_state" : "state IS NOT NULL",
+        "valid_country" : "country IS NOT NULL",
+        "valid_latitude" : "CAST(latitude as double) IS NOT NULL",
+        "valid_longitude" : "CAST(longitude as double) IS NOT NULL",
+        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
+        "new_data_rescued_data" : "_rescued_data IS NULL",          
+        },
+    "payments" :
+        {
+        # "valid_payment_id"  : "CAST(payment_id as bigint) IS NOT NULL",
+        # "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
+        # "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL",
+        "valid_payment_method" : "payment_method IS NOT NULL",
+        "valid_payment_status" : "payment_status IS NOT NULL",
+        "valid_payment_amount" : "CAST(amount as double) IS NOT NULL",
+        "valid_transaction_time" : "CAST(transaction_time as timestamp) IS NOT NULL",
+        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
+        "new_data_rescued_data" : "_rescued_data IS NULL",
+        },
+    "trips" :
+        {
+        # "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL",
+        # "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
+        # "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL",
+        # "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL",
+        "valid_trip_start_time" : "CAST(trip_start_time as timestamp) IS NOT NULL",
+        "valid_trip_end_time" : "CAST(trip_end_time as timestamp) IS NOT NULL",
+        "vaild_trip_start_location" : "start_location IS NOT NULL", 
+        "vaild_trip_end_location" : "end_location IS NOT NULL",
+        "valid_trip_distance_km" : "CAST(distance_km as double) IS NOT NULL",
+        "valid_fare_amount" : "CAST(fare_amount as double) IS NOT NULL",
+        "valid_payment_method" : "payment_method IS NOT NULL",
+        "valid_trip_status" : "trip_status IS NOT NULL",
+        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
+        "new_data_rescued_data" : "_rescued_data IS NULL"
+        },
+    "vehicules" :
+        {
+        # "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL",
+        "vaild_license_plate" : "license_plate IS NOT NULL",
+        "valid_year" : "CAST(year as int) IS NOT NULL",
+        "valid_vehicule_type" : "vehicule_type IS NOT NULL",
+        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
+        "new_data_rescued_data" : "_rescued_data IS NULL"
+        }
+        
+}
+
+
+
+    
+            

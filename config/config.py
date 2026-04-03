@@ -33,3 +33,15 @@ GOLD_ZONE = f"{CATALOG}.{GOLD_SCHEMA}"
 # PATH SAVE FILES GOLD
 # ----------------------
 GOLD_PATH_DATA = f"/Volumes/{CATALOG}/{GOLD_SCHEMA}/goldvolume/data/{PROJET_NAME}/"
+
+
+# -----------------------------
+# Importer la config et transformations
+# -----------------------------
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+from pyspark.sql.types import NumericType
+from delta.tables import DeltaTable
+from pyspark.sql.window import Window

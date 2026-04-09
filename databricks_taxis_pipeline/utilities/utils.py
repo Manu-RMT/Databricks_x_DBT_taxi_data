@@ -46,6 +46,8 @@ def clean_data_df(entity,df):
                     .withColumn('city', upper(col('city')))
                     .withColumn('modified_at', current_timestamp()) 
                     .withColumn("customer_id",col('customer_id').cast('bigint'))
+                    .withColumn("last_updated_timestamp",col('last_updated_timestamp').cast('timestamp'))
+                    
                     
                          
             )
@@ -59,6 +61,7 @@ def clean_data_df(entity,df):
                     .withColumn("driver_id",col('driver_id').cast('bigint'))
                     .withColumn("vehicle_id",col('vehicle_id').cast('bigint'))
                     .withColumn("driver_rating",col('driver_rating').cast('float'))  
+                    .withColumn("last_updated_timestamp",col('last_updated_timestamp').cast('timestamp'))
                    
             )
         case "locations": 
@@ -71,6 +74,7 @@ def clean_data_df(entity,df):
                     .withColumn("location_id",col('location_id').cast('bigint'))
                     .withColumn("latitude",col('latitude').cast('float'))
                     .withColumn("longitude",col('longitude').cast('float'))
+                    .withColumn("last_updated_timestamp",col('last_updated_timestamp').cast('timestamp'))
                    
             )
         case "payments":
@@ -83,6 +87,7 @@ def clean_data_df(entity,df):
                     .withColumn("customer_id",col('customer_id').cast('bigint'))
                     .withColumn("trip_id",col('trip_id').cast('bigint'))
                     .withColumn("amount",col('amount').cast('float'))
+                    .withColumn("last_updated_timestamp",col('last_updated_timestamp').cast('timestamp'))
                    
             )
         case "trips":
@@ -100,6 +105,7 @@ def clean_data_df(entity,df):
                     .withColumn("fare_amount",col('fare_amount').cast('float'))
                     .withColumn("trip_start_time",col('trip_start_time').cast('timestamp'))
                     .withColumn("trip_end_time",col('trip_end_time').cast('timestamp'))
+                    .withColumn("last_updated_timestamp",col('last_updated_timestamp').cast('timestamp'))
                     
                    
             )
@@ -110,6 +116,8 @@ def clean_data_df(entity,df):
                     .withColumn('model', upper(col('model')))
                     .withColumn('modified_at', current_timestamp())
                     .withColumn('vehicle_id',col('vehicle_id').cast('bigint'))
+                    .withColumn("year",col('year').cast('int'))
+                    .withColumn("last_updated_timestamp",col('last_updated_timestamp').cast('timestamp'))
                    
             )
 
@@ -117,3 +125,28 @@ def clean_data_df(entity,df):
             
 
 
+def delete_duplicates(df : DataFrame,dedup_cols: list, cdc_table : str):
+    df = df.withColumn("dedupkey", concat(*dedup_cols))
+    df = df.withColumn("dedupCount", row_number().over(Window.partitionBy("dedupkey").orderBy(desc(cdc_table))))
+    df = df.filter(col("dedupCount") == 1).orderBy("dedupkey")
+    df = df.drop("dedupkey", "dedupCount")
+
+    return df
+    
+
+def get_duplicates(df: DataFrame, column_names: list) -> DataFrame:
+   """
+   Retourne les lignes dupliquées basées sur une liste de colonnes.
+   Inclut toutes les occurrences des doublons.
+   """
+   # 1. Compter les occurrences pour chaque groupe de colonnes
+   duplicate_counts = df.groupBy(column_names).count().filter("count > 1")
+   # 2. Joindre avec le DataFrame original pour récupérer toutes les colonnes
+   # On utilise un 'inner join' pour ne garder que ce qui est dans duplicate_counts
+   duplicates = df.join(
+       duplicate_counts.select(column_names),
+       on=column_names,
+       how="inner"
+   )
+   return duplicates
+    

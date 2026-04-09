@@ -32,118 +32,101 @@ df.schema
 
 # COMMAND ----------
 
-VALID_RULES_OR_FAIL = {
-   "customers" : 
-        {
-        "valid_customer_id" : "CAST(customer_id as bigint)  IS NOT NULL"
-        },
-    "drivers" : 
-        {
-        "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL"
-        },
-     "locations" : 
-        {
-        "valid_location_id" : "CAST(location_id as bigint) IS NOT NULL"
-        },
-     "payments" :
-        {
-        "valid_payment_id"  : "CAST(payment_id as bigint) IS NOT NULL",
-        "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
-        "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL"
-        },
-    "trips" :
-        {
-        "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL",
-        "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
-        "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL",
-        "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL"
-        },
-    "vehicules" :
-        {
-        "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL"
-        }
+df = spark.sql(f"select * from {BRONZE_ZONE}.taxi_bronze_customers_ingestion_cleaned")
+display(df.count())
 
-}
-
-VALID_RULES_OR_DROP = {
-
-    "customers" : 
-        {
-        # "valid_customer_id" : "CAST(customer_id as bigint)  IS NOT NULL",
-        "vaild_first_name"  : "first_name IS NOT NULL",
-        "valid_last_name"   : "last_name IS NOT NULL",
-        "valid_email":         r"email IS NOT NULL AND email RLIKE '^[a-zA-Z0-9][a-zA-Z0-9._-]*@[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$'",
-        "valid_phone":         "phone_number IS NOT NULL",
-        "valid_city" :         "city IS NOT NULL",
-        "signup_date" :        "CAST(signup_date as date) IS NOT NULL",
-        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
-        "new_data_rescued_data" : "_rescued_data IS NULL",
-        },
-    "drivers" : 
-        {
-        # "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL",
-        "vaild_first_name"  : "first_name IS NOT NULL",
-        "valid_last_name"   : "last_name IS NOT NULL",
-        "valid_phone":        "phone_number IS NOT NULL",
-        "valid_vehicule_id" : "CAST(vehicule_id as int) IS NOT NULL",
-        "valid_driver_rating" : "CAST(driver_rating as double) IS NOT NULL",
-        "valid_city" :        "city IS NOT NULL",
-        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
-        "new_data_rescued_data" : "_rescued_data IS NULL",
-        },
-    "locations" : 
-        {
-        # "valid_location_id" : "CAST(location_id as bigint) IS NOT NULL",
-        "valid_city" : "city IS NOT NULL",
-        "valid_state" : "state IS NOT NULL",
-        "valid_country" : "country IS NOT NULL",
-        "valid_latitude" : "CAST(latitude as double) IS NOT NULL",
-        "valid_longitude" : "CAST(longitude as double) IS NOT NULL",
-        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
-        "new_data_rescued_data" : "_rescued_data IS NULL",          
-        },
-    "payments" :
-        {
-        # "valid_payment_id"  : "CAST(payment_id as bigint) IS NOT NULL",
-        # "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
-        # "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL",
-        "valid_payment_method" : "payment_method IS NOT NULL",
-        "valid_payment_status" : "payment_status IS NOT NULL",
-        "valid_payment_amount" : "CAST(amount as double) IS NOT NULL",
-        "valid_transaction_time" : "CAST(transaction_time as timestamp) IS NOT NULL",
-        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
-        "new_data_rescued_data" : "_rescued_data IS NULL",
-        },
-    "trips" :
-        {
-        # "valid_trip_id"     : "CAST(trip_id as bigint) IS NOT NULL",
-        # "valid_customer_id" : "CAST(customer_id as bigint) IS NOT NULL",
-        # "valid_driver_id"   : "CAST(driver_id as bigint) IS NOT NULL",
-        # "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL",
-        "valid_trip_start_time" : "CAST(trip_start_time as timestamp) IS NOT NULL",
-        "valid_trip_end_time" : "CAST(trip_end_time as timestamp) IS NOT NULL",
-        "vaild_trip_start_location" : "start_location IS NOT NULL", 
-        "vaild_trip_end_location" : "end_location IS NOT NULL",
-        "valid_trip_distance_km" : "CAST(distance_km as double) IS NOT NULL",
-        "valid_fare_amount" : "CAST(fare_amount as double) IS NOT NULL",
-        "valid_payment_method" : "payment_method IS NOT NULL",
-        "valid_trip_status" : "trip_status IS NOT NULL",
-        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
-        "new_data_rescued_data" : "_rescued_data IS NULL"
-        },
-    "vehicules" :
-        {
-        # "valid_vehicule_id" : "CAST(vehicule_id as bigint) IS NOT NULL",
-        "vaild_license_plate" : "license_plate IS NOT NULL",
-        "valid_year" : "CAST(year as int) IS NOT NULL",
-        "valid_vehicule_type" : "vehicule_type IS NOT NULL",
-        "last_updated_timestamp": "CAST(last_updated_timestamp as timestamp) IS NOT NULL",
-        "new_data_rescued_data" : "_rescued_data IS NULL"
-        }
-        
-}
-
-
-
+def delete_duplicates(df : DataFrame,dedup_cols:List, cdc_table : str):
+    df = df.withColumn("dedupkey", concat(*dedup_cols))
+    df = df.withColumn("dedupCount", row_number().over(Window.partitionBy("dedupkey").orderBy(desc(cdc_table))))
+    df = df.filter(col("dedupCount") == 1).orderBy("dedupkey")
+    df = df.drop("dedupkey", "dedupCount")
     
-            
+    return df
+    
+df = delete_duplicates(df,['customer_id'],"last_updated_timestamp")
+df = df.withColumn('phone_number', regexp_replace(col('phone_number'), r'[^0-9]', ''))
+df = df.withColumn('email', regexp_replace(col('email'), r'[^a-zA-Z0-9@.]', ''))
+df = df.withColumn('domain', regexp_replace(col('email'), r'^.*@', ''))
+df = df.withColumn('full_name',concat_ws(' ',col('first_name'),col('last_name')))
+
+display(df)
+
+
+# COMMAND ----------
+
+df = spark.sql(f"select * from {BRONZE_ZONE}.taxi_bronze_payments_ingestion_cleaned")
+display(df.count())
+
+def delete_duplicates(df : DataFrame,dedup_cols:List, cdc_table : str):
+    df = df.withColumn("dedupkey", concat(*dedup_cols))
+    df = df.withColumn("dedupCount", row_number().over(Window.partitionBy("dedupkey").orderBy(desc(cdc_table))))
+    df = df.filter(col("dedupCount") == 1).orderBy("dedupkey")
+    df = df.drop("dedupkey", "dedupCount")
+    
+    return df
+
+def get_duplicates(df: DataFrame, column_names: list) -> DataFrame:
+   """
+   Retourne les lignes dupliquées basées sur une liste de colonnes.
+   Inclut toutes les occurrences des doublons.
+   """
+   # 1. Compter les occurrences pour chaque groupe de colonnes
+   duplicate_counts = df.groupBy(column_names).count().filter("count > 1")
+   # 2. Joindre avec le DataFrame original pour récupérer toutes les colonnes
+   # On utilise un 'inner join' pour ne garder que ce qui est dans duplicate_counts
+   duplicates = df.join(
+       duplicate_counts.select(column_names),
+       on=column_names,
+       how="inner"
+   )
+   return duplicates
+
+df = get_duplicates(df,['trip_id','customer_id'])
+df.orderBy("trip_id","payment_id").display()
+
+
+
+
+# df = delete_duplicates(df,['trip_id','customer_id'],"last_updated_timestamp")
+# df = df.withColumn('payment_status_final', 
+#                     when( ((col("payment_method") == "CARD") & (col("payment_status") == "SUCCESS")),"ONLINE_SUCCESS")
+#                     .when( ((col("payment_method") == "CARD") & (col("payment_status") == "FAILED")),"ONLINE_FAILED")
+#                     .when( ((col("payment_method") == "CARD") & (col("payment_status") == "PENDING")),"ONLINE_PENDING")
+#                     .when( ((col("payment_method") != "CARD") & (col("payment_status") == "SUCCESS")),"OFFLINE_SUCCESS")
+#                     .when( ((col("payment_method") != "CARD") & (col("payment_status") == "FAILED")),"OFFLINE_FAILED")
+#                     .when( ((col("payment_method") != "CARD") & (col("payment_status") == "PENDING")),"ONLINE_PENDING")
+#                     .otherwise("INVALID")
+#                     )
+# df = df.withColumn('amount', floor(col('amount'),2))
+# df = df.withColumn('modified_at',current_timestamp())
+
+# display(df)
+
+# COMMAND ----------
+
+df = spark.sql(f"select * from {BRONZE_ZONE}.taxi_bronze_trips_ingestion_cleaned")
+df = delete_duplicates(df,['trip_id','customer_id','driver_id','vehicle_id'],"last_updated_timestamp")
+
+df = get_duplicates(df,['trip_id','customer_id','driver_id','vehicle_id'])
+df.orderBy("customer_id","driver_id","vehicle_id").display()
+
+# df = df.withColumn('payyment_type', when(col("payment_method") == "WALLET", "online").otherwise("physical"))
+# df = df.withColumn('modified_at',current_timestamp())
+
+
+
+
+# COMMAND ----------
+
+entites = {
+           "trips"     : "Historic of Trip Taxi cleaned",
+           "vehicules" : "List of Vehicles cleaned",
+           "payments"  : "Historic of Payment cleaned",
+           "locations" : "Localisation of Taxi cleaned",
+           "drivers"   : "Drivers cleaned",
+           "customers" : "Customers Cleaned" 
+           }
+
+for i in entites:
+    df = spark.sql(f"drop table {SILVER_ZONE}.taxi_silver_{i}")
+    

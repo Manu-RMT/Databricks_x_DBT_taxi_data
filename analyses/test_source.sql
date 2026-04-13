@@ -1,0 +1,1 @@
+SELECT * from {{ source("silver_layer","taxi_silver_payments")}} order by payment_id asc

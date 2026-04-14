@@ -1,4 +1,4 @@
-{{ config(materialize='incremental', uninque_key='trip_id') }}
+{{ config(materialized='incremental', uninque_key='trip_id') }}
 
 {% set colonnes = [ 
 'trip_id',

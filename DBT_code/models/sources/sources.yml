@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: silver_layer
+    schema: 02_silver
+    database: workspace
+
+    tables:
+      - name: taxi_silver_customers
+      - name: taxi_silver_drivers
+      - name: taxi_silver_locations
+      - name: taxi_silver_payments
+      - name: taxi_silver_trips
+      - name: taxi_silver_vehicules

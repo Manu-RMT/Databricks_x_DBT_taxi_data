@@ -1,6 +1,6 @@
 snapshots:
   - name: taxi_dim_customers
-    relation: source("silver_layer","taxi_silver_customers")
+    relation: ref("ephemeral_customers")
     config:
         schema: 03_gold
         database: workspace

@@ -1,1 +1,1 @@
-SELECT * from {{ source("silver_layer","taxi_silver_payments")}} order by payment_id asc
+SELECT * from {{ source("silver_layer","taxi_silver_trips")}} order by trip_id asc

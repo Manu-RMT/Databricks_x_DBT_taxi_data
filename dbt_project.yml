@@ -43,4 +43,4 @@ models:
       +schema: 02_silver
     03_gold:
       +materialized: table
-      +schema: 03_silver
+      +schema: 03_gold

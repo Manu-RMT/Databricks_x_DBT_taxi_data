@@ -1,0 +1,10 @@
+snapshots:
+  - name: taxi_dim_locations
+    relation: source("silver_layer","taxi_silver_locations")
+    config:
+        schema: 03_gold
+        database: workspace
+        unique_key: location_id
+        strategy: timestamp
+        updated_at : modified_at
+        dbt_valid_to_current: "to_date('9999-12-31')"
